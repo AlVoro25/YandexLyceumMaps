@@ -33,25 +33,43 @@ search_params = {
 
 response = requests.get(search_api_server, params=search_params)
 json_2 = response.json()
-toponym = json_2["features"][0]
+toponym = json_2["features"]
+pharmaces = toponym[:10]
+points = [f"{pharmacy['geometry']['coordinates'][0]},{pharmacy['geometry']['coordinates'][1]}" for pharmacy in pharmaces]
+maxi = 0
+point2 = 0
+lat = False
+for pharmacy in pharmaces:
+    if "Hours" in pharmacy["properties"]["CompanyMetaData"].keys():
+        if "круглосуточно" in pharmacy["properties"]["CompanyMetaData"]["Hours"]["text"]:
+            points[pharmaces.index(pharmacy)] += ",pmgns"
+        else:
+            points[pharmaces.index(pharmacy)] += ",pmdbs"
+    else:
+        points[pharmaces.index(pharmacy)] += ",pmgrs"
+    if abs(float(pharmacy["geometry"]["coordinates"][0]) - float(toponym_longitude)) > maxi:
+        maxi = abs(float(pharmacy["geometry"]["coordinates"][0]) - float(toponym_longitude))
+        point2 = float(pharmacy["geometry"]["coordinates"][0])
+        lat = False
+    if abs(float(pharmacy["geometry"]["coordinates"][1]) - float(toponym_lattitude)) > maxi:
+        maxi = abs(float(pharmacy["geometry"]["coordinates"][1]) - float(toponym_lattitude))
+        point2 = float(pharmacy["geometry"]["coordinates"][1])
+        lat = True
+points = "~".join(points)
 coords = json_2["features"][0]["geometry"]["coordinates"]
 pharmacy_coordinates = f"{coords[0]},{coords[1]}"
+if not lat:
+    to_check = toponym_longitude
+else:
+    to_check = toponym_lattitude
 map_params = {
     "ll": ",".join([toponym_longitude, toponym_lattitude]),
-    "spn": spn_value(str(toponym_longitude), str(coords[0])),
+    "spn": spn_value(str(to_check), str(point2)),
     "l": "map",
-    "pt": ",".join([toponym_longitude, toponym_lattitude, "home~" + pharmacy_coordinates, "flag"])
+    "pt": points
 }
 map_api_server = "http://static-maps.yandex.ru/1.x/"
 response = requests.get(map_api_server, params=map_params)
 
 Image.open(BytesIO(
     response.content)).show()
-distance = int(lonlat_distance(toponym_coodrinates.split(), coords))
-adress = toponym["properties"]["CompanyMetaData"]["address"]
-name = toponym["properties"]["CompanyMetaData"]["name"]
-time = toponym["properties"]["CompanyMetaData"]["Hours"]["text"]
-print(f'Расстояние до аптеки: {distance}м.')
-print(f"Название аптеки: {name}")
-print(f"Адресс аптеки: {adress}")
-print(f"Время работы: {time}")
